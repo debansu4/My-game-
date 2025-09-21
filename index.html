@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Defender | Space Shooter Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.stars.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Press+Start+2P&display=swap');
+        body {
+            font-family: 'Orbitron', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>'), auto;
+        }
+        #gameCanvas { position: fixed; top: 0; left: 0; z-index: 1; }
+        #vanta-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+        .game-ui { position: fixed; z-index: 2; color: white; text-shadow: 0 0 10px #00ffff, 0 0 20px #0088ff; }
+        .pixel-font { font-family: 'Press Start 2P', cursive; }
+        .glow { animation: glow 2s infinite alternate; }
+        @keyframes glow { from { text-shadow: 0 0 5px #fff,0 0 10px #fff,0 0 15px #0073e6,0 0 20px #0073e6; } to { text-shadow:0 0 10px #fff,0 0 20px #fff,0 0 30px #0073e6,0 0 40px #0073e6; } }
+        .powerup { animation: pulse 0.5s infinite alternate; }
+        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.2); } }
+    </style>
+</head>
+<body class="bg-black text-white">
+    <div id="vanta-bg"></div>
+
+    <!-- Main Menu -->
+    <div id="mainMenu" class="fixed inset-0 flex flex-col items-center justify-center z-10 transition-opacity duration-500">
+        <div class="text-center" data-aos="zoom-in">
+            <h1 class="text-6xl md:text-8xl font-bold mb-8 glow pixel-font">COSMIC DEFENDER</h1>
+            <div class="space-y-6">
+                <button id="startGame" class="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-lg text-2xl font-bold transition-all transform hover:scale-105 pixel-font">START GAME</button>
+                <button id="howToPlay" class="px-8 py-4 bg-purple-600 hover:bg-purple-700 rounded-lg text-2xl font-bold transition-all transform hover:scale-105 pixel-font">HOW TO PLAY</button>
+                <button id="settings" class="px-8 py-4 bg-gray-600 hover:bg-gray-700 rounded-lg text-2xl font-bold transition-all transform hover:scale-105 pixel-font">SETTINGS</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- How to Play Modal -->
+    <div id="howToPlayModal" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-20 hidden">
+        <div class="bg-gray-900 p-8 rounded-lg max-w-2xl mx-4" data-aos="zoom-in">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-bold text-blue-400 pixel-font">HOW TO PLAY</h2>
+                <button id="closeHowToPlay" class="text-white hover:text-red-500"><i data-feather="x" class="w-8 h-8"></i></button>
+            </div>
+            <div class="space-y-4 text-lg">
+                <p><span class="text-yellow-400 font-bold">Objective:</span> Defend the galaxy by destroying enemy ships and surviving as long as possible.</p>
+                <p><span class="text-yellow-400 font-bold">Controls:</span></p>
+                <ul class="list-disc pl-6 space-y-2">
+                    <li><span class="text-green-400">WASD</span> or <span class="text-green-400">Arrow Keys</span> to move</li>
+                    <li><span class="text-green-400">Space</span> or <span class="text-green-400">Left Click</span> to shoot</li>
+                    <li><span class="text-green-400">P</span> to pause</li>
+                </ul>
+                <p><span class="text-yellow-400 font-bold">Power-ups:</span></p>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex items-center"><div class="w-8 h-8 bg-red-500 rounded-full mr-2 powerup"></div><span>Extra Firepower</span></div>
+                    <div class="flex items-center"><div class="w-8 h-8 bg-blue-500 rounded-full mr-2 powerup"></div><span>Shield Boost</span></div>
+                    <div class="flex items-center"><div class="w-8 h-8 bg-yellow-500 rounded-full mr-2 powerup"></div><span>Score Multiplier</span></div>
+                    <div class="flex items-center"><div class="w-8 h-8 bg-green-500 rounded-full mr-2 powerup"></div><span>Health Pack</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game UI -->
+    <div id="gameUI" class="hidden">
+        <div class="game-ui top-4 left-4 flex items-center space-x-4">
+            <div class="flex items-center"><i data-feather="heart" class="text-red-500 mr-2"></i><span id="health" class="text-xl">100</span></div>
+            <div class="flex items-center"><i data-feather="zap" class="text-yellow-400 mr-2"></i><span id="score" class="text-xl">0</span></div>
+            <div class="flex items-center"><i data-feather="clock" class="text-blue-400 mr-2"></i><span id="time" class="text-xl">00:00</span></div>
+        </div>
+        <div id="pauseMenu" class="fixed inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center z-10 hidden">
+            <h2 class="text-5xl font-bold mb-8 text-blue-400 pixel-font">GAME PAUSED</h2>
+            <div class="space-y-6">
+                <button id="resumeGame" class="px-8 py-4 bg-green-600 hover:bg-green-700 rounded-lg text-2xl font-bold transition-all transform hover:scale-105 pixel-font">RESUME</button>
+                <button id="quitGame" class="px-8 py-4 bg-red-600 hover:bg-red-700 rounded-lg text-2xl font-bold transition-all transform hover:scale-105 pixel-font">QUIT TO MENU</button>
+            </div>
+        </div>
+        <div id="gameOverMenu" class="fixed inset-0 bg-black bg-opacity-90 flex flex-col items-center justify-center z-10 hidden">
+            <h2 class="text-6xl font-bold mb-4 text-red-500 pixel-font">GAME OVER</h2>
+            <p class="text-2xl mb-8">Your score: <span id="finalScore" class="text-yellow-400">0</span></p>
+            <div class="space-y-6">
+                <button id="restartGame" class="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-lg text-2xl font-bold transition-all transform hover:scale-105 pixel-font">PLAY AGAIN</button>
+                <button id="returnToMenu" class="px-8 py-4 bg-gray-600 hover:bg-gray-700 rounded-lg text-2xl font-bold transition-all transform hover:scale-105 pixel-font">MAIN MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas" class="hidden"></canvas>
+
+    <script>
+        // Initialize libraries
+        AOS.init();
+        feather.replace();
+        VANTA.STARS({ el: "#vanta-bg", mouseControls: true, touchControls: true, gyroControls: false, minHeight: 200, minWidth: 200, scale:1, scaleMobile:1, color:0x3a86ff, backgroundColor:0x10101a, size:1.5, quantity:3 });
+
+        // Game state
+        let gameState = { menu:true, playing:false, paused:false, gameOver:false };
+
+        // DOM elements
+        const mainMenu = document.getElementById('mainMenu');
+        const gameUI = document.getElementById('gameUI');
+        const gameCanvas = document.getElementById('gameCanvas');
+        const howToPlayModal = document.getElementById('howToPlayModal');
+        const pauseMenu = document.getElementById('pauseMenu');
+        const gameOverMenu = document.getElementById('gameOverMenu');
+
+        // Buttons
+        document.getElementById('startGame').addEventListener('click', startGame);
+        document.getElementById('howToPlay').addEventListener('click', () => howToPlayModal.classList.remove('hidden'));
+        document.getElementById('closeHowToPlay').addEventListener('click', () => howToPlayModal.classList.add('hidden'));
+        document.getElementById('resumeGame').addEventListener('click', resumeGame);
+        document.getElementById('quitGame').addEventListener('click', quitToMenu);
+        document.getElementById('restartGame').addEventListener('click', startGame);
+        document.getElementById('returnToMenu').addEventListener('click', quitToMenu);
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e)=>{if(gameState.playing&&!gameState.paused&&e.key==='p'){pauseGame();}});
+
+        // Variables for gameplay
+        let ctx, canvasWidth, canvasHeight;
+        let player, enemies=[], bullets=[], powerups=[];
+        let score, health, gameTime, lastEnemySpawn=0, lastPowerupSpawn=0;
+        let keys = {};
+
+        document.addEventListener('keydown', e=>keys[e.key.toLowerCase()]=true);
+        document.addEventListener('keyup', e=>keys[e.key.toLowerCase()]=false);
+
+        function startGame() {
+            gameState = {menu:false, playing:true, paused:false, gameOver:false};
+            mainMenu.classList.add('hidden'); gameUI.classList.remove('hidden'); gameCanvas.classList.remove('hidden');
+            pauseMenu.classList.add('hidden'); gameOverMenu.classList.add('hidden');
+
+            // Initialize canvas
+            const canvas = gameCanvas;
+            ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            canvasWidth = canvas.width;
+            canvasHeight = canvas.height;
+
+            // Initialize game variables
+            score=0; health=100; gameTime=0; enemies=[]; bullets=[]; powerups=[];
+            lastEnemySpawn=0; lastPowerupSpawn=0;
+
+            player = {x:canvasWidth/2, y:canvasHeight-100, width:50, height:50, speed:5, color:'#3a86ff', isShooting:false, lastShot:0, shotDelay:300, powerups:{doubleShot:false, shield:false}};
+
+            gameLoop();
+            handlePlayerMovement();
+        }
+
+        function gameLoop() {
+            if(!gameState.playing || gameState.paused) return;
+            updateGame();
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateGame() {
+            gameTime += 1/60;
+            if(Date.now() - lastEnemySpawn > 1000){ spawnEnemy(); lastEnemySpawn=Date.now();}
+            if(Date.now() - lastPowerupSpawn > 8000){ spawnPowerup(); lastPowerupSpawn=Date.now(); }
+
+            // Move enemies, bullets, powerups
+            enemies.forEach(e=>e.y+=e.speed);
+            bullets.forEach(b=>b.y-=b.speed);
+            powerups.forEach(p=>p.y+=p.speed);
+
+            // Remove offscreen
+            bullets = bullets.filter(b=>b.y>-10);
+            enemies = enemies.filter(e=>e.y<canvasHeight+50);
+            powerups = powerups.filter(p=>p.y<canvasHeight+20);
+
+            checkCollisions();
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('health').textContent=health;
+            document.getElementById('score').textContent=score;
+            const minutes = Math.floor(gameTime/60).toString().padStart(2,'0');
+            const seconds = Math.floor(gameTime%60).toString().padStart(2,'0');
+            document.getElementById('time').textContent=`${minutes}:${seconds}`;
+        }
+
+        function drawGame() {
+            ctx.clearRect(0,0,canvasWidth,canvasHeight);
+            drawPlayer();
+            drawEnemies();
+            drawBullets();
+            drawPowerups();
+        }
+
+        function drawPlayer() {
+            ctx.save();
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.moveTo(player.x, player.y - player.height/2);
+            ctx.lineTo(player.x+player.width/2, player.y+player.height/2);
+            ctx.lineTo(player.x-player.width/2, player.y+player.height/2);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle='#fff';
+            ctx.beginPath(); ctx.arc(player.x, player.y-5,10,0,Math.PI*2); ctx.fill();
+            if(player.isShooting){ ctx.fillStyle='#ff6600'; ctx.beginPath(); ctx.moveTo(player.x-15,player.y+player.height/2); ctx.lineTo(player.x,player.y+player.height/2+20); ctx.lineTo(player.x+15,player.y+player.height/2); ctx.closePath(); ctx.fill();}
+            if(player.powerups.shield){ ctx.strokeStyle='#0ff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(player.x,player.y,player.width+10,0,Math.PI*2); ctx.stroke();}
+            ctx.restore();
+        }
+
+        function drawEnemies(){ enemies.forEach(enemy=>{ ctx.save(); ctx.fillStyle=enemy.color; ctx.beginPath(); ctx.moveTo(enemy.x,enemy.y+enemy.height/2); ctx.lineTo(enemy.x+enemy.width/2,enemy.y-enemy.height/2); ctx.lineTo(enemy.x-enemy.width/2,enemy.y-enemy.height/2); ctx.closePath(); ctx.fill(); ctx.fillStyle='#f00'; ctx.beginPath(); ctx.arc(enemy.x,enemy.y+5,5,0,Math.PI*2); ctx.fill(); ctx.restore();}); }
+
+        function drawBullets(){ bullets.forEach(b=>{ ctx.save(); ctx.fillStyle=b.color; ctx.beginPath(); ctx.arc(b.x,b.y,b.radius,0,Math.PI*2); ctx.fill(); ctx.restore(); }); }
+
+        function drawPowerups(){ powerups.forEach(p=>{ ctx.save(); ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,p.radius,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 16px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; let icon=''; switch(p.type){case'health':icon='H';break;case'doubleShot':icon='2X';break;case'shield':icon='S';break;case'score':icon='P';break;} ctx.fillText(icon,p.x,p.y); ctx.restore();}); }
+
+        function spawnEnemy(){ const size=Math.random()*30+20; enemies.push({x:Math.random()*(canvasWidth-size)+size/2, y:-size, width:size, height:size, speed:Math.random()*2+1, color:`hsl(${Math.random()*60},100%,50%)`, health:Math.floor(size/10)}); }
+
+        function spawnPowerup(){ const types=['health','doubleShot','shield','score']; const type=types[Math.floor(Math.random()*types.length)]; let color=''; switch(type){case'health':color='#0f0';break;case'doubleShot':color='#f00';break;case'shield':color='#0ff';break;case'score':color='#ff0';break;} powerups.push({x:Math.random()*(canvasWidth-40)+20, y:-20, radius:15, speed:2, type:type, color:color}); }
+
+        function shoot(){ const now=Date.now(); if(now-player.lastShot>player.shotDelay){player.lastShot=now; bullets.push({x:player.x, y:player.y-player.height/2, radius:5, speed:10, color:'#ff0'}); if(player.powerups.doubleShot){ bullets.push({x:player.x-15,y:player.y-player.height/2,radius:5,speed:10,color:'#ff0'}); bullets.push({
